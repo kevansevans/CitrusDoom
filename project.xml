@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+	
+	<meta title="Citrus Doom" package="com.Kevans.CitrusDoom" version="1.0.0" company="Kaelan" />
+	<app main="Main" file="Citrus Doom" path="bin" />
+	
+	<source path="src" />
+	
+	<haxelib name="lime" />
+	<haxelib name="hxdoom" />
+	<haxelib name="haxe-gl-matrix" />
+	
+	<assets path="assets" exclude="*.svg" />
+	<assets path="assets/shareware" rename="IWADS"/>
+	
+	<!--Set default icon, then overide with supported targets -->
+	<icon path="assets/icon.png"/>
+	
+</project>
