@@ -61,6 +61,8 @@ class Main extends Application
 			return data;
 		});
 		#end
+		
+		hxdoom.start();
 	}
 	public static function main () {
 		
@@ -214,45 +216,6 @@ class Main extends Application
 	var ticks:Int = 0;
 	var framecount = 0;
 	var mscount = 0;
-	
-	override public function update(deltaTime:Int):Void 
-	{
-		super.update(deltaTime);
-		
-		ticks += deltaTime;
-		
-		if (ticks >= 1000 / 35) {
-			
-			if (Environment.PLAYER_MOVING_FORWARD) {
-				Engine.ACTIVEMAP.actors_players[0].move(5);
-			}
-			
-			if (Environment.PLAYER_MOVING_BACKWARD) {
-				Engine.ACTIVEMAP.actors_players[0].move(-5);
-			}
-			
-			if (Environment.PLAYER_TURNING_LEFT) {
-				Engine.ACTIVEMAP.actors_players[0].angle += 1;
-			}
-			
-			if (Environment.PLAYER_TURNING_RIGHT) {
-				Engine.ACTIVEMAP.actors_players[0].angle -= 1;
-			}
-			
-			ticks = 0;
-			
-			if (Engine.ACTIVEMAP != null) Engine.ACTIVEMAP.setVisibleSegments();
-		}
-		
-		framecount += 1;
-		mscount += deltaTime;
-		if (framecount >= window.frameRate) {
-			var average = mscount / window.frameRate;
-			//trace("FPS: " + Std.int(1000 / average));
-			framecount = 0;
-			mscount = 0;
-		}
-	}
 	
 	var mousex:Float = 0;
 	var mousey:Float = 0;
