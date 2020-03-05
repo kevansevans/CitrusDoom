@@ -42,27 +42,24 @@ class Main extends Application
 		/*
 		 * We're going to assume an iwad picker of some sorts has been made already
 		 */ 
-		#if android
-		macro throw "android deployment not yet understood XoX";
-		//App crashes when loading in a wad. Doesn't crash when using the JS method, but crashes when the data
-		//is handled in engine side of things
-		#elseif (windows || linux || macos || osx)
+		#if (windows || linux || macos || osx)
 		hxdoom.loadWad(File.getBytes("./IWADS/DOOM1.WAD"), "DOOM1.WAD");
 		
 		hxdoom.loadMap(0);
 		
 		wadsLoaded = true;
-		#elseif (js)
+		
+		hxdoom.start();
+		#elseif (js || android)
 		var waddata = Assets.loadBytes("IWADS/DOOM1.WAD");
 		waddata.onComplete(function(data:Bytes):Bytes {
 			hxdoom.loadWad(data, "DOOM1.WAD");
 			hxdoom.loadMap(0);
 			wadsLoaded = true;
+			hxdoom.start();
 			return data;
 		});
 		#end
-		
-		hxdoom.start();
 	}
 	public static function main () {
 		
@@ -110,13 +107,15 @@ class Main extends Application
 		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
 	}
 	
+	#if !android
 	override public function onWindowResize(width:Int, height:Int):Void 
 	{
 		super.onWindowResize(width, height);
 		
 		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
-		gl_scene.resize();
+		if (gl_scene != null) gl_scene.resize();
 	}
+	#end
 	
 	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
