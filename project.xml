@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project>
 	
-	<meta title="Citrus Doom" package="com.Kevans.CitrusDoom" version="1.0.0" company="Kaelan" />
+	<meta title="Citrus Doom" package="com.Kevans.CitrusDoom" version="0.0.1" company="Kaelan" />
+	<!---- Incriment this when testing android deployment, otherwise app doesn't refresh -->
+	<meta build-number="001" />
+	
 	<app main="Main" file="Citrus Doom" path="bin" />
 	
 	<source path="src" />

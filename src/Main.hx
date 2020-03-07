@@ -60,6 +60,10 @@ class Main extends Application
 			return data;
 		});
 		#end
+		
+		#if android
+			trace("HAHAHAHAHA");
+		#end
 	}
 	public static function main () {
 		
@@ -107,7 +111,6 @@ class Main extends Application
 		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
 	}
 	
-	#if !android
 	override public function onWindowResize(width:Int, height:Int):Void 
 	{
 		super.onWindowResize(width, height);
@@ -115,7 +118,6 @@ class Main extends Application
 		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
 		if (gl_scene != null) gl_scene.resize();
 	}
-	#end
 	
 	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
