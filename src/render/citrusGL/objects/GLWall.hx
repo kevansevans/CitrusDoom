@@ -284,12 +284,16 @@ class GLWall
 		
 		if (!segment.visible) return;
 		
+		if (_program == null) return;
+		
 		var loadedLineBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, loadedLineBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(plane_vertexes), gl.STATIC_DRAW);
 		
-		var posAttributeLocation = gl.getAttribLocation(_program, "V3_POSITION");
-		var colorAttributeLocation = gl.getAttribLocation(_program, "V4_COLOR");
+		var posAttributeLocation:Null<Int> = gl.getAttribLocation(_program, "V3_POSITION");
+		var colorAttributeLocation:Null<Int> = gl.getAttribLocation(_program, "V4_COLOR");
+		
+		if (posAttributeLocation == null || colorAttributeLocation == null) return;
 		
 		gl.vertexAttribPointer(
 			posAttributeLocation,
