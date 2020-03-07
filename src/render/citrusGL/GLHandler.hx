@@ -44,6 +44,7 @@ class GLHandler
 	
 	public function resize() {
 		gl.viewport(0, 0, window.width, window.height);
+		Engine.RENDER.screen_width = window.width;
 	}
 	
 	public function render_scene() {
