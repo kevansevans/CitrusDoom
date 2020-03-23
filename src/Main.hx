@@ -1,8 +1,12 @@
 package;
 
+import game.GameCore;
+import lime.graphics.RenderContext;
 import lime.ui.KeyModifier;
 import lime.ui.MouseWheelMode;
-import render.citrusGL.GLHandler;
+import lime.ui.WindowAttributes;
+import openfl.display.Stage;
+import sys.io.FileInput;
 
 import haxe.io.Bytes;
 import lime.ui.KeyCode;
@@ -20,106 +24,90 @@ import js.Browser;
 import lime.utils.Bytes;
 import lime.utils.Assets;
 import lime.app.Application;
-import lime.graphics.RenderContext;
 import lime.ui.KeyCode;
 
-import hxdoom.Engine;
-import hxdoom.common.Environment;
+import haxe.ui.Toolkit;
 
 class Main extends Application 
 {
-	var wadsLoaded:Bool = false;
 	
-	var gl_scene:GLHandler;
+	var gamecore:GameCore;
+	var closeAfterLaunch:Bool = true;
 	
-	var hxdoom:Engine;
+	var entryway:Stage;
 	
 	public function new () {
-		super ();
-		
-		hxdoom = new Engine();
-		
-		/*
-		 * We're going to assume an iwad picker of some sorts has been made already
-		 */ 
-		#if (windows || linux || macos || osx)
-		hxdoom.loadWad(File.getBytes("./IWADS/DOOM1.WAD"), "DOOM1.WAD");
-		
-		hxdoom.loadMap(0);
-		
-		wadsLoaded = true;
-		
-		hxdoom.start();
-		#elseif (js || android)
-		var waddata = Assets.loadBytes("IWADS/DOOM1.WAD");
-		waddata.onComplete(function(data:Bytes):Bytes {
-			hxdoom.loadWad(data, "DOOM1.WAD");
-			hxdoom.loadMap(0);
-			wadsLoaded = true;
-			hxdoom.start();
-			return data;
-		});
-		#end
-		
-		#if android
-			trace("HAHAHAHAHA");
-		#end
-	}
-	public static function main () {
-		
-		var app = new Main ();
-		return app.exec ();
-		
-	}
-	public override function render (context:RenderContext):Void {
-		
-		if (!wadsLoaded) return;
-		
-		switch (context.type) {
-			
-			//Desktop, Android, and HTML5 with WebGL support
-			case OPENGL, OPENGLES, WEBGL:
-				
-				if (gl_scene == null) {
-					gl_scene = new GLHandler(context, window);
-					gl_scene.programMapGeometry.buildMapGeometry();
-				} else {
-					gl_scene.render_scene();
-				}
-				
-			//HTML5 without WebGL support
-			case CANVAS :
-				#if js
-					Browser.alert("Canvas renderer not yet supported, many apologies");
-				#end
-				
-			case DOM :
-				throw "I have no idea what DOM is or how you're running it, but it's not supported here unfortunately. Many apologies";
-			case FLASH :
-				throw "This throw is only noticeable in Adobe Air. Flash rendering is not yet supported. Many Apologies";
-			default:
-				throw "Render context not supported";
-		}
+		super();
 	}
 	
 	override public function onWindowCreate():Void 
 	{
 		super.onWindowCreate();
 		
-		window.frameRate = 120;
+		window.frameRate = 30;
 		
-		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
+		window.width = 640;
+		window.height = 480;
+		
+		entryway = new Stage(this.window, 0xCCCCCC);
+		addModule(entryway);
+		
+		build_ui();
 	}
 	
-	override public function onWindowResize(width:Int, height:Int):Void 
+	function build_ui() 
 	{
-		super.onWindowResize(width, height);
+		Toolkit.init();
 		
-		window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
-		if (gl_scene != null) gl_scene.resize();
+		var wadlist:Array<String> = new Array();
+		
+		#if !sys
+		
+		#else
+		
+		var templist:Array<String> = new Array(); 
+		
+		var env = Sys.environment();
+		
+		if (env["DOOMWADDIR"] != null) {
+			templist = FileSystem.readDirectory(env["DOOMWADDIR"]);
+		}
+		
+		for (wad in templist) {
+			var name = wad.toUpperCase();
+			if (name.lastIndexOf(".WAD") != -1) {
+				var iwad:Bool = verify_iwad(File.read(env["DOOMWADDIR"] + "/" + wad, true));
+				if (iwad) {
+					wadlist.push(env["DOOMWADDIR"] + "/" + wad);
+				}
+			}
+		}
+		
+		trace(wadlist);
+		
+		#end
 	}
 	
-	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
+	function verify_iwad(read:sys.io.FileInput):Bool
+	{
+		var file = read;
+		if (file.readString(4) == "IWAD") return true;
+		else return false;
+	}
+	
+	override public function render(context:RenderContext):Void 
+	{
+		super.render(context);
+	}
+	
+	function launchGame() {
+		gamecore = new GameCore(this, {});
+		if (closeAfterLaunch) {
+			this.window.close();
+		}
+	}
+	
+	/*override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
 		super.onKeyUp(keyCode, modifier);
 		
@@ -177,7 +165,7 @@ class Main extends Application
 				trace(Environment.SCREEN_DISTANCE_FROM_VIEWER);
 			
 			default :
-				
+				trace (keyCode);
 		}
 	}
 	
@@ -204,51 +192,17 @@ class Main extends Application
 		#end
 		
 		//JS throws errors here, find an alternative method?
-	}
+	}*/
 	
-	override public function onMouseWheel(deltaX:Float, deltaY:Float, deltaMode:MouseWheelMode):Void 
+	/*override public function onMouseWheel(deltaX:Float, deltaY:Float, deltaMode:MouseWheelMode):Void 
 	{
 		super.onMouseWheel(deltaX, deltaY, deltaMode);
 		
 		var mxa:Float = 
 		Environment.AUTOMAP_ZOOM += (0.0001 * deltaY) / (1 / Environment.AUTOMAP_ZOOM / 200);
-	}
+	}*/
 	
-	var ticks:Int = 0;
-	var framecount = 0;
-	var mscount = 0;
-	
-	var mousex:Float = 0;
-	var mousey:Float = 0;
-	
-	override public function onMouseMove(_x:Float, _y:Float):Void 
-	{
-		super.onMouseMove(_x, _y);
+	public static function getWadDir() {
 		
-		#if js
-		return;
-		#end
-		
-		if (!Environment.IS_IN_AUTOMAP) {
-			mousex = _x;
-			mousey = _y;
-			
-			var distx = (window.width / 2) - mousex;
-			var disty = (window.height / 2) - mousey;
-			
-			distx *= 0.25;
-			disty *= 0.25;
-			
-			if (Engine.ACTIVEMAP != null) {
-				Engine.ACTIVEMAP.actors_players[0].angle += distx;
-				Engine.ACTIVEMAP.actors_players[0].pitch += disty;
-			}
-			
-			window.warpMouse(Std.int(window.width / 2), Std.int(window.height / 2));
-			
-			if (gl_scene != null) {
-				gl_scene.programMapGeometry.buildMapGeometry();
-			}
-		}
 	}
 }
