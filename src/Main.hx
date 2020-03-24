@@ -192,7 +192,7 @@ class Main extends Application
 		freedoom_github.onData = function(_packet:String) {
 			var data:Dynamic = Json.parse(_packet);
 			for (index in 0...(Std.int(data.assets.length - 1))) {
-				download_file(data.assets[index].browser_download_url, env["DOOMWADDIR"] + "/downloads/", data.assets[index].name, data.assets[index].size);
+				download_file(data.assets[index].browser_download_url, env["DOOMWADDIR"] + "/downloads/", data.assets[index].name);
 			}
 		}
 		freedoom_github.onError = function(_packet:String) {
@@ -203,9 +203,11 @@ class Main extends Application
 		}
 		freedoom_github.setHeader('User-Agent', 'CitrusDoom');
 		freedoom_github.request();
+		
+		download_file('http://distro.ibiblio.org/pub/linux/distributions/slitaz/sources/packages/d/doom1.wad', env["DOOMWADDIR"], "doom1.wad");
 	}
 	
-	function download_file(_url:String, _path:String, _name:String, _size:Int) {
+	function download_file(_url:String, _path:String, _name:String) {
 		
 		++pendingdownload;
 		
