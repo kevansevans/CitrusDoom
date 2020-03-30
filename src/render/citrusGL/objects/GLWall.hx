@@ -273,6 +273,62 @@ class GLWall
 				
 			case BACK_TOP:
 				
+				plane_vertexes[index] 		= segment.start.xpos;
+				plane_vertexes[index += 1] 	= segment.start.ypos;
+				plane_vertexes[index += 1] 	= segment.frontSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
+				plane_vertexes[index += 1] 	= segment.end.xpos;
+				plane_vertexes[index += 1] 	= segment.end.ypos;
+				plane_vertexes[index += 1] 	= segment.frontSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
+				plane_vertexes[index += 1] 	= segment.start.xpos;
+				plane_vertexes[index += 1] 	= segment.start.ypos;
+				plane_vertexes[index += 1] 	= segment.backSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
+				////////////////////////////////////////////////////////////////////////////////////////////////////
+				
+				plane_vertexes[index += 1] 	= segment.end.xpos;
+				plane_vertexes[index += 1] 	= segment.end.ypos;
+				plane_vertexes[index += 1] 	= segment.backSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
+				plane_vertexes[index += 1] 	= segment.start.xpos;
+				plane_vertexes[index += 1] 	= segment.start.ypos;
+				plane_vertexes[index += 1] 	= segment.backSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
+				plane_vertexes[index += 1] 	= segment.end.xpos;
+				plane_vertexes[index += 1] 	= segment.end.ypos;
+				plane_vertexes[index += 1] 	= segment.frontSector.ceilingHeight;
+				
+				plane_vertexes[index += 1] 	= segment.r_color;
+				plane_vertexes[index += 1] 	= segment.g_color;
+				plane_vertexes[index += 1] 	= segment.b_color;
+				plane_vertexes[index += 1] 	= 1.0;
+				
 			case BACK_MIDDLE:
 				
 			case BACK_BOTTOM:
