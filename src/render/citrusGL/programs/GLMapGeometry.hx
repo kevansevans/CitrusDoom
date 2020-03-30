@@ -10,6 +10,7 @@ import render.citrusGL.objects.GLWall;
 import hxdoom.Engine;
 import hxdoom.common.Environment;
 import hxdoom.abstracts.Angle;
+import hxdoom.lumps.map.Segment;
 
 /**
  * ...
@@ -23,7 +24,7 @@ class GLMapGeometry
 	var vertex_shader:GLShader;
 	var fragment_shader:GLShader;
 	
-	var planes:Array<GLWall>;
+	var planes:Map<Segment, Array<GLWall>>;
 	
 	var safeToRender:Bool = false;
 	
@@ -58,56 +59,29 @@ class GLMapGeometry
 	}
 	
 	public function buildMapGeometry() {
+		trace("Beep");
+		
 		safeToRender = false;
 		
+		planes = new Map();
 		var mapSegments = Engine.ACTIVEMAP.segments;
 		
 		var numplanes:Int = 0;
 		for (seg in mapSegments) {
+			
+			planes[seg] = new Array();
+			
 			if (seg.lineDef.solid) {
-				numplanes += 1;
+				planes[seg][0] = new GLWall(gl, seg, SideType.SOLID);
 				continue;
-			}
-			if (seg.lineDef.frontSideDef.lower_texture != "-") numplanes += 1;
-			if (seg.lineDef.frontSideDef.middle_texture != "-") numplanes += 1;
-			if (seg.lineDef.frontSideDef.upper_texture != "-") numplanes += 1;
-			if (seg.lineDef.backSideDef.lower_texture != "-") numplanes += 1;
-			if (seg.lineDef.backSideDef.middle_texture != "-") numplanes += 1;
-			if (seg.lineDef.backSideDef.upper_texture != "-") numplanes += 1;
-		}
-		
-		planes = new Array();
-		planes.resize(numplanes);
-		
-		var p_index = 0;
-		
-		for (s_index in 0...mapSegments.length) {
-			var segment = mapSegments[s_index];
-			
-			if (segment.lineDef.solid) {
-				planes[p_index] = new GLWall(gl, mapSegments[s_index], SideType.SOLID);
 			} else {
-				if (segment.lineDef.frontSideDef.lower_texture != "-") {
-					planes[p_index] = new GLWall(gl, mapSegments[s_index], SideType.FRONT_BOTTOM);
-				}
-				if (segment.lineDef.frontSideDef.middle_texture != "-") {
-					planes[p_index += 1] = new GLWall(gl, mapSegments[s_index], SideType.FRONT_MIDDLE);
-				}
-				if (segment.lineDef.frontSideDef.upper_texture != "-") {
-					planes[p_index += 1] = new GLWall(gl, mapSegments[s_index], SideType.FRONT_TOP);
-				}
-				if (segment.lineDef.backSideDef.lower_texture != "-") {
-					planes[p_index += 1] = new GLWall(gl, mapSegments[s_index], SideType.BACK_BOTTOM);
-				}
-				if (segment.lineDef.backSideDef.middle_texture != "-") {
-					planes[p_index += 1] = new GLWall(gl, mapSegments[s_index], SideType.BACK_MIDDLE);
-				}
-				if (segment.lineDef.backSideDef.upper_texture != "-") {
-					planes[p_index += 1] = new GLWall(gl, mapSegments[s_index], SideType.BACK_TOP);
-				}
+				planes[seg][0] = new GLWall(gl, seg, SideType.FRONT_BOTTOM);
+				planes[seg][1] = new GLWall(gl, seg, SideType.FRONT_MIDDLE);
+				planes[seg][2] = new GLWall(gl, seg, SideType.FRONT_TOP);
+				planes[seg][3] = new GLWall(gl, seg, SideType.BACK_BOTTOM);
+				planes[seg][4] = new GLWall(gl, seg, SideType.BACK_MIDDLE);
+				planes[seg][5] = new GLWall(gl, seg, SideType.BACK_TOP);
 			}
-			
-			++p_index;
 		}
 		
 		safeToRender = true;
@@ -125,24 +99,28 @@ class GLMapGeometry
 		var p_segment = p_subsector.segments[0];
 		var p_viewheight = p_segment.frontSector.floorHeight + 41;
 		
-		var startAngle:Angle =  Engine.ACTIVEMAP.actors_players[0].angleToVertex(p_segment.start) - Engine.ACTIVEMAP.actors_players[0].angle;
-		var endAngle:Angle =  Engine.ACTIVEMAP.actors_players[0].angleToVertex(p_segment.end) - Engine.ACTIVEMAP.actors_players[0].angle;
-		var span:Angle = startAngle - endAngle;
-		
 		Mat4Tools.identity(worldArray);
 		Mat4Tools.lookAt(	[Engine.ACTIVEMAP.actors_players[0].xpos, Engine.ACTIVEMAP.actors_players[0].ypos, p_viewheight], 
 							[Engine.ACTIVEMAP.actors_players[0].xpos_look, Engine.ACTIVEMAP.actors_players[0].ypos_look, p_viewheight + Engine.ACTIVEMAP.actors_players[0].zpos_look], 
 							[0, 0, 1], viewArray);
-		Mat4Tools.perspective(45 * (Math.PI / 180), _winWidth / _winHeight, 0.1, 10000, projArray);
+		Mat4Tools.perspective(45 * (Math.PI / 180), 320 / 200, 0.1, 10000, projArray);
 		
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_World"), false, worldArray);
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_View"), false, viewArray);
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_Proj"), false, projArray);
 		
-		for (plane in planes) {
-			if (plane == null) continue;
-			plane.bind(program);
-			plane.render();
+		var lastseg:Null<Segment> = null;
+		for (vis_seg in Engine.RENDER.virtual_screen) {
+			if (lastseg == null || vis_seg != lastseg) {
+				for (plane in planes[vis_seg]) {
+					if (plane == null) continue;
+					plane.bind(program);
+					plane.render();
+				}
+				lastseg = vis_seg;
+			} else {
+				continue;
+			}
 		}
 	}
 	
