@@ -1,5 +1,6 @@
 package render.citrusGL;
 
+import hxdoom.core.RenderCore;
 import lime.graphics.RenderContext;
 import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLProgram;
@@ -21,7 +22,7 @@ import hxdoom.common.Environment;
  * @author Kaelan
  * 
  */
-class GLHandler 
+class GLHandler extends RenderCore
 {
 	var gl:WebGLRenderContext;
 	var context:RenderContext;
@@ -32,6 +33,8 @@ class GLHandler
 	
 	public function new(_context:RenderContext, _window:Window) 
 	{
+		super();
+		
 		gl = _context.webgl;
 		window = _window;
 		context = _context;
@@ -44,10 +47,15 @@ class GLHandler
 	
 	public function resize() {
 		gl.viewport(0, 0, window.width, window.height);
-		Engine.RENDER.screen_width = window.width;
+		//Engine.RENDER.screen_width = window.width;
 	}
 	
-	public function render_scene() {
+	override public function initializeRenderEnvironment() 
+	{
+		programMapGeometry.buildMapGeometry();
+	}
+	
+	override public function render_scene() {
 		
 		
 		//remove color buffer bit to allow HOM effect.

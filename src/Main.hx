@@ -1,6 +1,5 @@
 package;
 
-import game.GameCore;
 import haxe.Http;
 import haxe.Json;
 import haxe.ui.components.Button;
@@ -21,11 +20,14 @@ import lime.ui.WindowAttributes;
 import openfl.net.URLRequest;
 import openfl.utils.ByteArray;
 import lime.net.HTTPRequest;
+import render.citrusGL.GLHandler;
+import hxdoom.Engine;
 
 import openfl.display.Stage;
 
 import haxe.io.Bytes;
 import lime.ui.KeyCode;
+import hxdoom.common.Environment;
 
 
 #if sys
@@ -48,13 +50,9 @@ import haxe.ui.Toolkit;
 
 class Main extends Application 
 {
-	
-	var gamecore:GameCore;
-	var closeAfterLaunch:Bool = true;
-	var multiwad:Bool;
-	var haswad:Bool = false;
-	
+	var hxdoom:Engine;
 	var entryway:Stage;
+	var env_path:Null<String>;
 	
 	#if sys
 	var pathlist:Map<String, String>;
@@ -73,11 +71,15 @@ class Main extends Application
 		window.width = 640;
 		window.height = 480;
 		
-		entryway = new Stage(this.window, 0xCCCCCC);
-		addModule(entryway);
+		/*
+		 * We're going to skip this for now until Lime updates.
+		 * Lime currently has a bug with removing the OpenFL stage and is currently unreliable.
+		 * This issue has been brought up and should come in the next update.
+		 */
+		//build_ui();
 		
-		build_ui();
 		getwads();
+		launchGame(File.getBytes(env_path + "/DOOM1.WAD"));
 	}
 	
 	var root_vbox:HBox = new HBox();
@@ -87,9 +89,13 @@ class Main extends Application
 	var grabwads:Button;
 	var iwad_selector:DropDown;
 	var wadDataSource:ArrayDataSource<String> = new ArrayDataSource();
+	var launch_button:Button;
 	function build_ui() 
 	{
 		Toolkit.init();
+		
+		entryway = new Stage(this.window, 0xCCCCCC);
+		addModule(entryway);
 		
 		entryway.addChild(root_vbox);
 		root_vbox.x = root_vbox.y = 5;
@@ -116,6 +122,15 @@ class Main extends Application
 		
 		iwad_selector.disabled = true;
 		iwad_selector.width = 150;
+		
+		launch_button = new Button();
+		leftbox.addComponent(launch_button);
+		launch_button.text = "Launch";
+		launch_button.onClick = function(e:UIEvent) {
+			var env = Sys.environment();
+			var wad = File.getBytes(env["DOOMWADDIR"] + "/" + iwad_selector.value);
+			launchGame(wad);
+		}
 	}
 	
 	function getwads()
@@ -126,7 +141,6 @@ class Main extends Application
 		#if !sys
 		
 		var shareware = Assets.getBytes("IWADS/DOOM1.WAD");
-		multiwad = false;
 		
 		#else
 		
@@ -134,45 +148,55 @@ class Main extends Application
 		pathlist = new Map();
 		
 		var env = Sys.environment();
+		env_path = env["DOOMWADDIR"];
 		
-		if (env["DOOMWADDIR"] != null) {
-			templist = FileSystem.readDirectory(env["DOOMWADDIR"]);
+		return;
+		
+		if (env_path != null) {
+			templist = FileSystem.readDirectory(env_path);
 		}
 		
 		for (wad in templist) {
 			var name = wad.toUpperCase();
 			if (name.lastIndexOf(".WAD") != -1) {
-				var iwad:Bool = verify_iwad(File.read(env["DOOMWADDIR"] + "/" + wad, true));
+				var iwad:Bool = verify_iwad(File.read(env_path + "/" + wad, true), wad);
 				if (iwad) {
-					haswad = true;
-					pathlist[wad] = env["DOOMWADDIR"] + "/" + wad;
+					pathlist[wad] = env_path + "/" + wad;
 				}
 			}
 		}
 		
-		multiwad = true;
-		
+		/*
 		wadDataSource = new ArrayDataSource();
 		for (wad in pathlist.keys()) {
 			wadDataSource.add(wad);
 		}
 		if (wadDataSource.size != 0) {
 			iwad_selector.disabled = false;
-			iwad_selector.value = "Select Wad...";
+			iwad_selector.selectedIndex = 0;
+			iwad_selector.updateComponentDisplay();
 		} else {
 			wadDataSource.add("No IWADS found");
 			iwad_selector.disabled = true;
 		}
-		iwad_selector.dataSource = wadDataSource;
+		iwad_selector.dataSource = wadDataSource;*/
 		
 		#end
 	}
 	
 	#if sys
-	function verify_iwad(read:sys.io.FileInput):Bool
+	function verify_iwad(read:FileInput, _name:String):Bool
 	{
 		var file = read;
-		if (file.readString(4) == "IWAD") return true;
+		var header:Null<String>;
+		try {
+			header = file.readString(4);
+		} catch (_msg:String) {
+			var warning:Label = new Label();
+			warning.text = "Error! Unknown file, potentially corrupted!\n" + _name +"\n" + _msg;
+			return false;
+		}
+		if (header == "IWAD") return true;
 		else return false;
 	}
 	
@@ -181,18 +205,18 @@ class Main extends Application
 	function download_wads() {
 		
 		var env = Sys.environment();
-		if (env["DOOMWADDIR"] == null) {
-			Sys.putEnv("DOOMWADDIR", Sys.programPath());
+		if (env_path == null) {
+			env_path = Sys.programPath() + "/wads";
 		}
 		
-		if (!FileSystem.isDirectory(env["DOOMWADDIR"] + "/downloads/")) FileSystem.createDirectory(env["DOOMWADDIR"] + "/downloads/");
+		if (!FileSystem.isDirectory(env_path + "/downloads/")) FileSystem.createDirectory(env_path + "/downloads/");
 		
 		var freedoom_github = new Http("https://api.github.com/repos/freedoom/freedoom/releases/latest");
 		//haxe you fucking crybaby
 		freedoom_github.onData = function(_packet:String) {
 			var data:Dynamic = Json.parse(_packet);
 			for (index in 0...(Std.int(data.assets.length - 1))) {
-				download_file(data.assets[index].browser_download_url, env["DOOMWADDIR"] + "/downloads/", data.assets[index].name);
+				download_file(data.assets[index].browser_download_url, env_path + "/downloads/", data.assets[index].name);
 			}
 		}
 		freedoom_github.onError = function(_packet:String) {
@@ -204,7 +228,7 @@ class Main extends Application
 		freedoom_github.setHeader('User-Agent', 'CitrusDoom');
 		freedoom_github.request();
 		
-		download_file('http://distro.ibiblio.org/pub/linux/distributions/slitaz/sources/packages/d/doom1.wad', env["DOOMWADDIR"], "doom1.wad");
+		download_file('http://distro.ibiblio.org/pub/linux/distributions/slitaz/sources/packages/d/doom1.wad', env_path, "DOOM1.WAD");
 	}
 	
 	function download_file(_url:String, _path:String, _name:String) {
@@ -248,15 +272,14 @@ class Main extends Application
 	
 	function process_downloads() 
 	{
-		var env = Sys.environment();
-		var downloads = FileSystem.readDirectory(env["DOOMWADDIR"] + "/downloads/");
+		var downloads = FileSystem.readDirectory(env_path + "/downloads/");
 		for (item in downloads) {
 			if (item.indexOf(".zip", item.length - 4) != -1) {
-				var zip = File.read(env["DOOMWADDIR"] + "/downloads/" + item);
+				var zip = File.read(env_path + "/downloads/" + item);
 				var entries = Reader.readZip(zip);
 				var redist_path:String = "";
 				for (entry in entries) {
-					var path = env["DOOMWADDIR"];
+					var path = env_path;
 					if (entry.fileName.indexOf("/", entry.fileName.length - 1) != -1) {
 						redist_path = entry.fileName;
 					}
@@ -268,8 +291,8 @@ class Main extends Application
 						fileout.write(cust_unzip(entry));
 						fileout.close();
 					}
-					else if ((item.indexOf("freedm") != -1 || item.indexOf("freedoom") != -1) && entry.fileName.indexOf("/", entry.fileName.length -1) == -1) {
-						path = env["DOOMWADDIR"] + "/freedoom redist/";
+					else {
+						path = env_path + "/redist/";
 						if (!FileSystem.isDirectory(path + redist_path)) FileSystem.createDirectory(path + redist_path);
 						if (FileSystem.exists(path + redist_path + entry.fileName)) FileSystem.deleteFile(path + redist_path + entry.fileName);
 						var fileout = File.write(path + entry.fileName);
@@ -279,9 +302,9 @@ class Main extends Application
 				}
 				zip.close();
 			}
-			FileSystem.deleteFile(env["DOOMWADDIR"] + "/downloads/" + item);
+			FileSystem.deleteFile(env_path + "/downloads/" + item);
 		}
-		FileSystem.deleteDirectory(env["DOOMWADDIR"] + "/downloads");
+		FileSystem.deleteDirectory(env_path + "/downloads");
 		getwads();
 	}
 	
@@ -303,104 +326,70 @@ class Main extends Application
 	
 	#end
 	
+	var render_override:Bool = false;
+	
 	override public function render(context:RenderContext):Void 
 	{
-		super.render(context);
-	}
-	
-	function launchGame() {
-		gamecore = new GameCore(this, {});
-		if (closeAfterLaunch) {
-			this.window.close();
-		}
-	}
-	
-	/*override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
-	{
-		super.onKeyUp(keyCode, modifier);
 		
-		switch(keyCode) {
-			
-			case KeyCode.SPACE :
-			
-			case KeyCode.TAB :
-				Environment.IS_IN_AUTOMAP = !Environment.IS_IN_AUTOMAP;
-				
-				Environment.NEEDS_TO_REBUILD_AUTOMAP = true;
-				
-			case KeyCode.NUMBER_1 :
-				hxdoom.loadMap(0);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_2 :
-				hxdoom.loadMap(1);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_3 :
-				hxdoom.loadMap(2);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_4 :
-				hxdoom.loadMap(3);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_5 :
-				hxdoom.loadMap(4);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_6 :
-				hxdoom.loadMap(5);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_7 :
-				hxdoom.loadMap(6);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_8 :
-				hxdoom.loadMap(7);
-				gl_scene.programMapGeometry.buildMapGeometry();
-			case KeyCode.NUMBER_9 :
-				hxdoom.loadMap(8);
-				gl_scene.programMapGeometry.buildMapGeometry();
-				
-			case KeyCode.LEFT:
-				Environment.PLAYER_TURNING_LEFT = false;
-			case KeyCode.RIGHT :
-				Environment.PLAYER_TURNING_RIGHT = false;
-			case KeyCode.UP | KeyCode.W :
-				Environment.PLAYER_MOVING_FORWARD = false;
-			case KeyCode.DOWN | KeyCode.S :
-				Environment.PLAYER_MOVING_BACKWARD = false;
-				
-			case KeyCode.I :
-				Environment.SCREEN_DISTANCE_FROM_VIEWER += 15;
-				trace(Environment.SCREEN_DISTANCE_FROM_VIEWER);
-			case KeyCode.K :
-				Environment.SCREEN_DISTANCE_FROM_VIEWER -= 15;
-				trace(Environment.SCREEN_DISTANCE_FROM_VIEWER);
-			
-			default :
-				trace (keyCode);
+		if (hxdoom == null) return;
+		
+		if (!render_override) {
+			//hook into Engine
+			Engine.RENDER = new GLHandler(context, this.window);
+			Engine.RENDER.initializeRenderEnvironment();
+			render_override = true;
 		}
+		
+		switch (context.type) {
+			
+			//Desktop, Android, and HTML5 with WebGL support
+			case OPENGL, OPENGLES, WEBGL:
+				
+				if (Engine.ACTIVEMAP != null) Engine.RENDER.setVisibleSegments();
+				Engine.RENDER.render_scene();
+				
+			//HTML5 without WebGL support
+			case CANVAS :
+				#if js
+					Browser.alert("Canvas renderer not yet supported, many apologies");
+				#end
+				
+			case DOM :
+				throw "I have no idea what DOM is or how you're running it, but it's not supported here unfortunately. Many apologies";
+			case FLASH :
+				throw "This throw is only noticeable in Adobe Air. Flash rendering is not yet supported. Many Apologies";
+			default:
+				throw "Render context not supported";
+		}
+	}
+	
+	function launchGame(_wadbytes:Bytes) {
+		//entryway.removeChild(root_vbox);
+		//removeModule(entryway);
+		//entryway = null;
+		hxdoom = new Engine();
+		hxdoom.loadWad(_wadbytes, "DOOM1.WAD");
+		hxdoom.loadMap(0);
+		
+	}
+	
+	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
+	{
+		#if debug
+		trace(keyCode, String.fromCharCode(keyCode));
+		#end
+		
+		Engine.IO.keyPress(keyCode);
 	}
 	
 	override public function onKeyDown(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
-		super.onKeyDown(keyCode, modifier);
-		
-		switch(keyCode) {
-			case KeyCode.LEFT :
-				Environment.PLAYER_TURNING_LEFT = true;
-			case KeyCode.RIGHT :
-				Environment.PLAYER_TURNING_RIGHT = true;
-			case KeyCode.UP | KeyCode.W :
-				Environment.PLAYER_MOVING_FORWARD = true;
-			case KeyCode.DOWN | KeyCode.S :
-				Environment.PLAYER_MOVING_BACKWARD = true;
-			default :
-				
-		}
-		
-		
-		#if !html5
-		Engine.CHEATS.logKeyStroke(String.fromCharCode(keyCode));
+		#if debug
+		trace(keyCode, String.fromCharCode(keyCode));
 		#end
 		
-		//JS throws errors here, find an alternative method?
-	}*/
+		Engine.IO.keyRelease(keyCode);
+	}
 	
 	/*override public function onMouseWheel(deltaX:Float, deltaY:Float, deltaMode:MouseWheelMode):Void 
 	{
