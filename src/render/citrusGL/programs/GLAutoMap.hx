@@ -58,9 +58,7 @@ class GLAutoMap
 
 	public function render(_winWidth:Int, _winHeight:Int) {
 		
-		if (Environment.NEEDS_TO_REBUILD_AUTOMAP) {
-			rebuildMapArray();
-		}
+		rebuildMapArray();
 		
 		var loadedLineBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, loadedLineBuffer);
