@@ -150,6 +150,10 @@ class Main extends Application
 		var env = Sys.environment();
 		env_path = env["DOOMWADDIR"];
 		
+		#if debug
+		trace(env_path);
+		#end
+		
 		return;
 		
 		if (env_path != null) {
