@@ -166,7 +166,6 @@ class Main extends Application
 			}
 		}
 		
-		/*
 		wadDataSource = new ArrayDataSource();
 		for (wad in pathlist.keys()) {
 			wadDataSource.add(wad);
@@ -179,7 +178,7 @@ class Main extends Application
 			wadDataSource.add("No IWADS found");
 			iwad_selector.disabled = true;
 		}
-		iwad_selector.dataSource = wadDataSource;*/
+		iwad_selector.dataSource = wadDataSource;
 		
 		#end
 	}
