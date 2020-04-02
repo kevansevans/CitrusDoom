@@ -75,6 +75,10 @@ class GLMapGeometry
 				planes[seg][0] = new GLWall(gl, seg, SideType.SOLID);
 				continue;
 			} else {
+				
+				var front = seg.lineDef.frontSideDef;
+				var back = seg.lineDef.backSideDef;
+				
 				planes[seg][0] = new GLWall(gl, seg, SideType.FRONT_BOTTOM);
 				planes[seg][1] = new GLWall(gl, seg, SideType.FRONT_MIDDLE);
 				planes[seg][2] = new GLWall(gl, seg, SideType.FRONT_TOP);
@@ -110,12 +114,11 @@ class GLMapGeometry
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_Proj"), false, projArray);
 		
 		var lastseg:Null<Segment> = null;
-		for (vis_seg in Engine.RENDER.virtual_screen) {
-			if (lastseg == null || vis_seg != lastseg) {
+		for (vis_seg in Engine.RENDER.vis_segments) {
+			if (vis_seg != lastseg) {
 				for (plane in planes[vis_seg]) {
 					if (plane == null) continue;
-					plane.bind(program);
-					plane.render();
+					plane.render(program);
 				}
 				lastseg = vis_seg;
 			} else {
