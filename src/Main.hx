@@ -375,20 +375,12 @@ class Main extends Application
 	
 	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
-		#if debug
-		trace(keyCode, String.fromCharCode(keyCode));
-		#end
-		
-		Engine.IO.keyPress(keyCode);
+		Engine.IO.keyRelease(keyCode);
 	}
 	
 	override public function onKeyDown(keyCode:KeyCode, modifier:KeyModifier):Void 
 	{
-		#if debug
-		trace(keyCode, String.fromCharCode(keyCode));
-		#end
-		
-		Engine.IO.keyRelease(keyCode);
+		Engine.IO.keyPress(keyCode);
 	}
 	
 	/*override public function onMouseWheel(deltaX:Float, deltaY:Float, deltaMode:MouseWheelMode):Void 
