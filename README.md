@@ -24,7 +24,9 @@ As of 13DEC2019, HxDoom utilizes the following:
 * Haxe 4.0.5
 * Lime 7.7.0
 * haxe-gl-matrix 1.0.1
-* HxDoom latest version
+* HxDoom
+
+Citrus Doom at times will rely on indev builds of HxDoom. If compiling fails, try installing the latest branch on the github site.
 
 Open up CitrusDoom.hxproj in Haxe Develop and hit the compile button
 
