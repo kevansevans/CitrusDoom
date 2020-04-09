@@ -79,7 +79,7 @@ class Main extends Application
 		//build_ui();
 		
 		getwads();
-		launchGame(File.getBytes(env_path + "/DOOM1.WAD"));
+		launchGame(File.getBytes(env_path + "/E1M1.WAD"));
 	}
 	
 	var root_vbox:HBox = new HBox();
@@ -150,15 +150,14 @@ class Main extends Application
 		var env = Sys.environment();
 		env_path = env["DOOMWADDIR"];
 		
-		#if debug
-		trace(env_path);
-		#end
-		
-		return;
-		
 		if (env_path != null) {
 			templist = FileSystem.readDirectory(env_path);
+		} else {
+			env_path = "./wads";
+			if (!FileSystem.isDirectory(env_path)) FileSystem.createDirectory(env_path);
 		}
+		
+		return;
 		
 		for (wad in templist) {
 			var name = wad.toUpperCase();
@@ -339,7 +338,7 @@ class Main extends Application
 		if (!render_override) {
 			//hook into Engine
 			Engine.RENDER = new GLHandler(context, this.window);
-			Engine.RENDER.initializeRenderEnvironment();
+			Engine.RENDER.initScene();
 			render_override = true;
 		}
 		
@@ -374,6 +373,13 @@ class Main extends Application
 		hxdoom.loadWad(_wadbytes, "DOOM1.WAD");
 		hxdoom.loadMap(0);
 		
+	}
+	
+	override public function onWindowResize(width:Int, height:Int):Void 
+	{
+		super.onWindowResize(width, height);
+		
+		if (Engine.RENDER != null) Engine.RENDER.resize(width, height);
 	}
 	
 	override public function onKeyUp(keyCode:KeyCode, modifier:KeyModifier):Void 
