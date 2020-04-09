@@ -42,16 +42,18 @@ class GLHandler extends RenderCore
 		programAutoMap = new GLAutoMap(gl);
 		programMapGeometry = new GLMapGeometry(gl);
 		
-		resize();
+		resize(window.width, window.height);
 	}
 	
-	public function resize() {
+	override public function resize(_width:Int, _height:Int) {
 		gl.viewport(0, 0, window.width, window.height);
-		//Engine.RENDER.screen_width = window.width;
+		screen_width = window.width;
 	}
 	
-	override public function initializeRenderEnvironment() 
+	override public function initScene() 
 	{
+		super.initScene();
+		
 		programMapGeometry.buildMapGeometry();
 	}
 	
@@ -79,8 +81,8 @@ class GLHandler extends RenderCore
 			gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 			
 			//backface culling
-			gl.enable(gl.CULL_FACE);
-			gl.cullFace(gl.BACK);
+			//gl.enable(gl.CULL_FACE);
+			//gl.cullFace(gl.BACK);
 			
 			programMapGeometry.render(window.width, window.height);
 			

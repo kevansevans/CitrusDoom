@@ -1,11 +1,15 @@
 package render.citrusGL.programs;
 
+import haxe.PosInfos;
+import haxe.ds.Vector;
+import hxdoom.lumps.map.SubSector;
 import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLProgram;
 import lime.graphics.opengl.GLShader;
 import lime.utils.Float32Array;
 import mme.math.glmatrix.Mat4Tools;
 import render.citrusGL.objects.GLWall;
+import render.citrusGL.objects.GLFlat;
 
 import hxdoom.Engine;
 import hxdoom.common.Environment;
@@ -24,7 +28,8 @@ class GLMapGeometry
 	var vertex_shader:GLShader;
 	var fragment_shader:GLShader;
 	
-	var planes:Map<Segment, Array<GLWall>>;
+	var walls:Map<Segment, Vector<GLWall>>;
+	var flats:Map<SubSector, Vector<GLFlat>>;
 	
 	var safeToRender:Bool = false;
 	
@@ -59,33 +64,42 @@ class GLMapGeometry
 	}
 	
 	public function buildMapGeometry() {
-		trace("Beep");
-		
 		safeToRender = false;
 		
-		planes = new Map();
+		walls = new Map();
 		var mapSegments = Engine.ACTIVEMAP.segments;
 		
-		var numplanes:Int = 0;
 		for (seg in mapSegments) {
 			
-			planes[seg] = new Array();
-			
 			if (seg.lineDef.solid) {
-				planes[seg][0] = new GLWall(gl, seg, SideType.SOLID);
+				walls[seg] = new Vector(1);
+				walls[seg][0] = new GLWall(gl, seg, SideType.SOLID);
 				continue;
 			} else {
+				walls[seg] = new Vector(3);
 				
 				var front = seg.lineDef.frontSideDef;
 				var back = seg.lineDef.backSideDef;
 				
-				planes[seg][0] = new GLWall(gl, seg, SideType.FRONT_BOTTOM);
-				planes[seg][1] = new GLWall(gl, seg, SideType.FRONT_MIDDLE);
-				planes[seg][2] = new GLWall(gl, seg, SideType.FRONT_TOP);
-				planes[seg][3] = new GLWall(gl, seg, SideType.BACK_BOTTOM);
-				planes[seg][4] = new GLWall(gl, seg, SideType.BACK_MIDDLE);
-				planes[seg][5] = new GLWall(gl, seg, SideType.BACK_TOP);
+				if (seg.side == 0) {
+					walls[seg][0] = new GLWall(gl, seg, SideType.FRONT_BOTTOM);
+					walls[seg][1] = new GLWall(gl, seg, SideType.FRONT_MIDDLE);
+					walls[seg][2] = new GLWall(gl, seg, SideType.FRONT_TOP);
+				} else if (seg.side == 1) {
+					walls[seg][0] = new GLWall(gl, seg, SideType.BACK_BOTTOM);
+					walls[seg][1] = new GLWall(gl, seg, SideType.BACK_MIDDLE);
+					walls[seg][2] = new GLWall(gl, seg, SideType.BACK_TOP);
+				}
 			}
+		}
+		
+		flats = new Map();
+		var mapSubsectors = Engine.ACTIVEMAP.subsectors;
+		
+		for (subsec in mapSubsectors) {
+			flats[subsec] = new Vector(2);
+			flats[subsec][0] = new GLFlat(gl, subsec, FlatType.FLOOR);
+			flats[subsec][1] = new GLFlat(gl, subsec, FlatType.FLOOR);
 		}
 		
 		safeToRender = true;
@@ -100,14 +114,13 @@ class GLMapGeometry
 		var projArray = new Float32Array(16);
 		
 		var p_subsector = Engine.ACTIVEMAP.getPlayerSubsector();
-		var p_segment = p_subsector.segments[0];
-		var p_viewheight = p_segment.frontSector.floorHeight + 41;
+		var p_viewheight = p_subsector.sector.floorHeight + 41;
 		
 		Mat4Tools.identity(worldArray);
 		Mat4Tools.lookAt(	[Engine.ACTIVEMAP.actors_players[0].xpos, Engine.ACTIVEMAP.actors_players[0].ypos, p_viewheight], 
 							[Engine.ACTIVEMAP.actors_players[0].xpos_look, Engine.ACTIVEMAP.actors_players[0].ypos_look, p_viewheight + Engine.ACTIVEMAP.actors_players[0].zpos_look], 
 							[0, 0, 1], viewArray);
-		Mat4Tools.perspective(45 * (Math.PI / 180), 320 / 200, 0.1, 10000, projArray);
+		Mat4Tools.perspective(45 * (Math.PI / 180), (_winWidth / _winHeight), 0.1, 10000, projArray);
 		
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_World"), false, worldArray);
 		gl.uniformMatrix4fv(gl.getUniformLocation(program, "M4_View"), false, viewArray);
@@ -115,460 +128,17 @@ class GLMapGeometry
 		
 		var lastseg:Null<Segment> = null;
 		for (vis_seg in Engine.RENDER.vis_segments) {
-			if (vis_seg != lastseg) {
-				for (plane in planes[vis_seg]) {
-					if (plane == null) continue;
-					plane.render(program);
-				}
-				lastseg = vis_seg;
-			} else {
-				continue;
+			for (plane in walls[vis_seg]) {
+				if (plane == null) continue;
+				plane.render(program);
 			}
+		}
+		
+		for (flat in flats) {
+			flat[0].render(program);
+			flat[1].render(program);
 		}
 	}
-	
-	/*public function buildMapArray() {
-		
-		var loadedsegs = Engine.ACTIVEMAP.getVisibleSegments();
-		var sectors = Engine.ACTIVEMAP.sectors;
-		var numSegs = ((loadedsegs.length -1) * 42);
-		map_lineverts.resize(numSegs);
-		var itemCount:Int = 0;
-		
-		for (segs in 0...loadedsegs.length) {
-			
-			if (loadedsegs[segs].lineDef.solid) {
-			
-				map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				////////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-				
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-				map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-				map_lineverts[itemCount += 1] 	= 1.0;
-				
-				++itemCount;
-			}
-			else {
-				
-				if (loadedsegs[segs].lineDef.frontSideDef.lower_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					++itemCount;
-				}
-				
-				if (loadedsegs[segs].lineDef.frontSideDef.middle_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					++itemCount;
-				}
-				
-				if (loadedsegs[segs].lineDef.frontSideDef.upper_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					++itemCount;
-				}
-				
-				if (loadedsegs[segs].lineDef.backSideDef.lower_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					++itemCount;
-				}
-				
-				if (loadedsegs[segs].lineDef.backSideDef.middle_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.floorHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 0.2;
-					
-					++itemCount;
-				}
-				
-				if (loadedsegs[segs].lineDef.backSideDef.upper_texture != "-") {
-					
-					map_lineverts[itemCount] 		= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					////////////////////////////////////////////////////////////////////////////////////////////////////
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].start.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].backSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.xpos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].end.ypos;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].frontSector.ceilingHeight;
-					
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].r_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].g_color;
-					map_lineverts[itemCount += 1] 	= loadedsegs[segs].b_color;
-					map_lineverts[itemCount += 1] 	= 1.0;
-					
-					++itemCount;
-				}
-			}
-		}
-		
-		Environment.NEEDS_TO_REBUILD_AUTOMAP = false;
-	}*/
 	
 	public static var vertex_source:String = [
 	#if !desktop
