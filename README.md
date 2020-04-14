@@ -1,5 +1,14 @@
 # Citrus Doom
 
+```
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//This repository will no longer be updated
+////////////////////////////////////////////////////////////////////////////////////////////////////
+```
+Turns out it's not that easy maintaining a haxelib AND and source that relies on said haxelib.
+Please visit: https://github.com/kevansevans/HxDoom for playable sources.
+
+
 Playable HTML5 Build here: https://kevansevans.github.io/HxDoom/
 
 ```
